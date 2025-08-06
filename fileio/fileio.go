@@ -17,10 +17,55 @@
 package fileio
 
 import (
+	"encoding/hex"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
+	"unsafe"
+
+	"github.com/bytedance/gg/gstd/gsync"
+	sha256simd "github.com/minio/sha256-simd"
 )
+
+var hashPool = gsync.Pool[hash.Hash]{
+	New: func() hash.Hash {
+		return sha256simd.New()
+	},
+}
+
+var bytesPool = gsync.Pool[*[]byte]{
+	New: func() *[]byte {
+		b := make([]byte, sha256simd.Size*2)
+		return &b
+	},
+}
+
+// HashFile computes the SHA-256 hash of the file at the given path.
+func HashFile(filepath string) (string, error) {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := hashPool.Get()
+	defer hashPool.Put(h)
+	h.Reset()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	dst := bytesPool.Get()
+	defer bytesPool.Put(dst)
+
+	src := h.Sum(nil)
+	hex.Encode(*dst, src)
+
+	out := unsafe.String(unsafe.SliceData(*dst), len(*dst))
+
+	return out, nil
+}
 
 // IsExist reports whether the given path exists.
 func IsExist(path string) bool {

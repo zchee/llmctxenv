@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zchee/llmctxenv/internal/fileio"
+	"github.com/zchee/llmctxenv/fileio"
 )
 
 // createFile creates a temporary file with the specified content and permissions.
@@ -528,7 +528,411 @@ func TestEdgeCases(t *testing.T) {
 	})
 }
 
-// Benchmark tests
+func TestHashFile(t *testing.T) {
+	tempDir := t.TempDir()
+
+	t.Run("basic file hashing", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			content  string
+			expected string // Known SHA-256 hash
+		}{
+			{
+				name:     "empty file",
+				content:  "",
+				expected: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", // SHA-256 of empty string
+			},
+			{
+				name:     "hello world",
+				content:  "Hello, World!",
+				expected: "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f", // SHA-256 of "Hello, World!"
+			},
+			{
+				name:     "single character",
+				content:  "A",
+				expected: "559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd", // SHA-256 of "A"
+			},
+			{
+				name:     "newline only",
+				content:  "\n",
+				expected: "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b", // SHA-256 of "\n"
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				filePath := createFile(t, tempDir, "test_"+strings.ReplaceAll(tt.name, " ", "_")+".txt", tt.content, 0644)
+
+				hash, err := fileio.HashFile(filePath)
+				if err != nil {
+					t.Fatalf("HashFile failed: %v", err)
+				}
+
+				if hash != tt.expected {
+					t.Errorf("HashFile() = %s, expected %s", hash, tt.expected)
+				}
+			})
+		}
+	})
+
+	t.Run("different file sizes", func(t *testing.T) {
+		tests := []struct {
+			name string
+			size int
+		}{
+			{"tiny", 10},
+			{"small", 1024},        // 1KB
+			{"medium", 64 * 1024},  // 64KB
+			{"large", 1024 * 1024}, // 1MB
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				content := strings.Repeat("X", tt.size)
+				filePath := createFile(t, tempDir, tt.name+"_file.txt", content, 0644)
+
+				hash1, err := fileio.HashFile(filePath)
+				if err != nil {
+					t.Fatalf("HashFile failed: %v", err)
+				}
+
+				// Verify hash consistency by running twice
+				hash2, err := fileio.HashFile(filePath)
+				if err != nil {
+					t.Fatalf("HashFile second call failed: %v", err)
+				}
+
+				if hash1 != hash2 {
+					t.Errorf("Hash inconsistency: first=%s, second=%s", hash1, hash2)
+				}
+
+				// Verify hash length (SHA-256 hex = 64 characters)
+				if len(hash1) != 64 {
+					t.Errorf("Hash length = %d, expected 64", len(hash1))
+				}
+
+				// Verify hash contains only hex characters
+				for _, c := range hash1 {
+					if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+						t.Errorf("Hash contains non-hex character: %c", c)
+						break
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("different content types", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			content string
+		}{
+			{"unicode", "Hello 世界! 🌍"},
+			{"binary_like", "\x00\x01\x02\x03\xFF\xFE"},
+			{"special_chars", "!@#$%^&*()_+-={}[]|\\:;\"'<>?,.`~"},
+			{"mixed_whitespace", " \t\n\r\v\f"},
+			{"long_line", strings.Repeat("This is a long line with various content. ", 100)},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				filePath := createFile(t, tempDir, tt.name+"_file.txt", tt.content, 0644)
+
+				hash, err := fileio.HashFile(filePath)
+				if err != nil {
+					t.Fatalf("HashFile failed: %v", err)
+				}
+
+				if len(hash) != 64 {
+					t.Errorf("Hash length = %d, expected 64", len(hash))
+				}
+			})
+		}
+	})
+
+	t.Run("error conditions", func(t *testing.T) {
+		t.Run("non-existent file", func(t *testing.T) {
+			nonExistentPath := filepath.Join(tempDir, "non_existent_file.txt")
+
+			hash, err := fileio.HashFile(nonExistentPath)
+			if err == nil {
+				t.Error("HashFile should fail with non-existent file")
+			}
+			if hash != "" {
+				t.Errorf("Hash should be empty on error, got %s", hash)
+			}
+		})
+
+		t.Run("empty file path", func(t *testing.T) {
+			hash, err := fileio.HashFile("")
+			if err == nil {
+				t.Error("HashFile should fail with empty file path")
+			}
+			if hash != "" {
+				t.Errorf("Hash should be empty on error, got %s", hash)
+			}
+		})
+
+		t.Run("directory instead of file", func(t *testing.T) {
+			dirPath := createDir(t, tempDir, "test_directory", 0755)
+
+			hash, err := fileio.HashFile(dirPath)
+			if err == nil {
+				t.Error("HashFile should fail when given a directory")
+			}
+			if hash != "" {
+				t.Errorf("Hash should be empty on error, got %s", hash)
+			}
+		})
+	})
+
+	t.Run("file path handling", func(t *testing.T) {
+		t.Run("absolute path", func(t *testing.T) {
+			content := "absolute path test"
+			filePath := createFile(t, tempDir, "absolute_test.txt", content, 0644)
+
+			hash, err := fileio.HashFile(filePath)
+			if err != nil {
+				t.Fatalf("HashFile failed with absolute path: %v", err)
+			}
+			if len(hash) != 64 {
+				t.Errorf("Hash length = %d, expected 64", len(hash))
+			}
+		})
+
+		t.Run("special characters in filename", func(t *testing.T) {
+			specialNames := []string{
+				"file with spaces.txt",
+				"file-with-dashes.txt",
+				"file_with_underscores.txt",
+				"file.with.dots.txt",
+				"file(with)parentheses.txt",
+				"file[with]brackets.txt",
+			}
+
+			for _, name := range specialNames {
+				t.Run(name, func(t *testing.T) {
+					content := "special filename content: " + name
+					filePath := createFile(t, tempDir, name, content, 0644)
+
+					hash, err := fileio.HashFile(filePath)
+					if err != nil {
+						t.Fatalf("HashFile failed with special filename %s: %v", name, err)
+					}
+					if len(hash) != 64 {
+						t.Errorf("Hash length = %d, expected 64", len(hash))
+					}
+				})
+			}
+		})
+	})
+
+	t.Run("hash consistency and determinism", func(t *testing.T) {
+		content := "consistency test content"
+		filePath := createFile(t, tempDir, "consistency_test.txt", content, 0644)
+
+		// Run HashFile multiple times and ensure results are consistent
+		const iterations = 10
+		var hashes []string
+
+		for i := range iterations {
+			hash, err := fileio.HashFile(filePath)
+			if err != nil {
+				t.Fatalf("HashFile iteration %d failed: %v", i, err)
+			}
+			hashes = append(hashes, hash)
+		}
+
+		// Verify all hashes are identical
+		expectedHash := hashes[0]
+		for i, hash := range hashes {
+			if hash != expectedHash {
+				t.Errorf("Hash inconsistency at iteration %d: got %s, expected %s", i, hash, expectedHash)
+			}
+		}
+	})
+}
+
+func TestHashFileSymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping symlink tests on Windows")
+	}
+
+	tempDir := t.TempDir()
+
+	t.Run("symlink to existing file", func(t *testing.T) {
+		content := "symlink target content"
+		target := createFile(t, tempDir, "symlink_target.txt", content, 0644)
+		symlink := filepath.Join(tempDir, "symlink.txt")
+
+		if err := os.Symlink(target, symlink); err != nil {
+			t.Fatalf("failed to create symlink: %v", err)
+		}
+
+		// Hash both target and symlink - should be identical
+		targetHash, err := fileio.HashFile(target)
+		if err != nil {
+			t.Fatalf("HashFile failed on target: %v", err)
+		}
+
+		symlinkHash, err := fileio.HashFile(symlink)
+		if err != nil {
+			t.Fatalf("HashFile failed on symlink: %v", err)
+		}
+
+		if targetHash != symlinkHash {
+			t.Errorf("Target hash (%s) != symlink hash (%s)", targetHash, symlinkHash)
+		}
+	})
+
+	t.Run("broken symlink", func(t *testing.T) {
+		nonExistentTarget := filepath.Join(tempDir, "non_existent_target.txt")
+		brokenSymlink := filepath.Join(tempDir, "broken_symlink.txt")
+
+		if err := os.Symlink(nonExistentTarget, brokenSymlink); err != nil {
+			t.Fatalf("failed to create broken symlink: %v", err)
+		}
+
+		hash, err := fileio.HashFile(brokenSymlink)
+		if err == nil {
+			t.Error("HashFile should fail with broken symlink")
+		}
+		if hash != "" {
+			t.Errorf("Hash should be empty on error, got %s", hash)
+		}
+	})
+}
+
+func TestHashFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping permission tests on Windows")
+	}
+
+	tempDir := t.TempDir()
+
+	t.Run("no read permission", func(t *testing.T) {
+		content := "permission test content"
+		filePath := createFile(t, tempDir, "no_read_perm.txt", content, 0000)
+
+		// Ensure cleanup works
+		defer func() {
+			os.Chmod(filePath, 0644)
+		}()
+
+		hash, err := fileio.HashFile(filePath)
+		if err == nil {
+			t.Error("HashFile should fail with no read permission")
+		}
+		if hash != "" {
+			t.Errorf("Hash should be empty on error, got %s", hash)
+		}
+	})
+}
+
+func TestHashFileConcurrent(t *testing.T) {
+	tempDir := t.TempDir()
+	content := "concurrent test content"
+	filePath := createFile(t, tempDir, "concurrent_test.txt", content, 0644)
+
+	const numGoroutines = 100
+	results := make(chan string, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	// Launch concurrent HashFile operations
+	for range numGoroutines {
+		go func() {
+			hash, err := fileio.HashFile(filePath)
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- hash
+		}()
+	}
+
+	// Collect results
+	var hashes []string
+	for range numGoroutines {
+		select {
+		case hash := <-results:
+			hashes = append(hashes, hash)
+		case err := <-errors:
+			t.Fatalf("Concurrent HashFile failed: %v", err)
+		}
+	}
+
+	// Verify all hashes are identical
+	if len(hashes) != numGoroutines {
+		t.Fatalf("Expected %d hashes, got %d", numGoroutines, len(hashes))
+	}
+
+	expectedHash := hashes[0]
+	for i, hash := range hashes {
+		if hash != expectedHash {
+			t.Errorf("Hash inconsistency at goroutine %d: got %s, expected %s", i, hash, expectedHash)
+		}
+	}
+}
+
+func BenchmarkHashFile(b *testing.B) {
+	tempDir := b.TempDir()
+
+	sizes := []struct {
+		name string
+		size int
+	}{
+		{"1KB", 1024},
+		{"10KB", 10 * 1024},
+		{"100KB", 100 * 1024},
+		{"1MB", 1024 * 1024},
+		{"10MB", 10 * 1024 * 1024},
+	}
+	for _, size := range sizes {
+		b.Run(size.name, func(b *testing.B) {
+			content := strings.Repeat("A", size.size)
+			source := createFile(b, tempDir, size.name+"bench_source.txt", content, 0644)
+
+			b.ResetTimer()
+			for i := 0; b.Loop(); i++ {
+				_, err := fileio.HashFile(source)
+				if err != nil {
+					b.Fatalf("HashFile failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkHashFileParallel(b *testing.B) {
+	tempDir := b.TempDir()
+
+	sizes := []struct {
+		name string
+		size int
+	}{
+		{"1KB", 1024},
+		{"100KB", 100 * 1024},
+		{"1MB", 1024 * 1024},
+	}
+
+	for _, size := range sizes {
+		b.Run(size.name, func(b *testing.B) {
+			content := strings.Repeat("B", size.size)
+			source := createFile(b, tempDir, size.name+"parallel_bench_source.txt", content, 0644)
+
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					_, err := fileio.HashFile(source)
+					if err != nil {
+						b.Fatalf("HashFile failed: %v", err)
+					}
+				}
+			})
+		})
+	}
+}
+
 func BenchmarkCopyFile(b *testing.B) {
 	tempDir := b.TempDir()
 

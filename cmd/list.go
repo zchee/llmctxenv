@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/zchee/llmctxenv/fileio"
 	"github.com/zchee/llmctxenv/instruction"
-	"github.com/zchee/llmctxenv/internal/fileio"
 )
 
 type listCmd struct {
