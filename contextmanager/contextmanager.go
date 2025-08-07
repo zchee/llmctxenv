@@ -37,6 +37,9 @@ var (
 // Provider represents the type of LLM provider for which the system context is defined.
 type Provider string
 
+// String returns a string representation of the [Provider] name.
+func (p Provider) String() string { return string(p) }
+
 const (
 	ProviderClaudeCode Provider = "claude"
 	ProviderGeminiCLI  Provider = "gemini-cli"
@@ -44,6 +47,7 @@ const (
 	ProviderCodex      Provider = "codex"
 	ProviderOpenCode   Provider = "opencode"
 	ProviderGoose      Provider = "goose"
+	ProviderCrush      Provider = "crush"
 )
 
 var SystemContextFiles = map[Provider][]string{
@@ -65,16 +69,46 @@ var SystemContextFiles = map[Provider][]string{
 	ProviderGoose: {
 		".goosehints",
 	},
+	ProviderCrush: {
+		"CRUSH.md",
+	},
 }
 
 // SystemContextGlobalDir returns the directory path for the global system context of a given provider.
 func SystemContextGlobalDir(provider Provider) string {
-	return filepath.Join(LLMCtxEnvRoot, "global", string(provider))
+	return filepath.Join(LLMCtxEnvRoot, "global", provider.String())
 }
 
 var dirnameReplacer = strings.NewReplacer(
 	".", "-",
 	string(filepath.Separator), "-",
+
+	"A", "!a",
+	"B", "!b",
+	"C", "!c",
+	"D", "!d",
+	"E", "!e",
+	"F", "!f",
+	"G", "!g",
+	"H", "!h",
+	"I", "!i",
+	"J", "!j",
+	"K", "!k",
+	"L", "!l",
+	"M", "!m",
+	"N", "!n",
+	"O", "!o",
+	"P", "!p",
+	"Q", "!q",
+	"R", "!r",
+	"S", "!s",
+	"T", "!t",
+	"U", "!u",
+	"V", "!v",
+	"W", "!w",
+	"X", "!x",
+	"Y", "!y",
+	"Z", "!z",
 )
 
 // SystemContextLocalDir returns the directory path for the local system context of a given provider.
@@ -97,5 +131,5 @@ func SystemContextLocalDir(provider Provider, projectDir string) (string, error)
 	path = strings.TrimPrefix(path, home+string(filepath.Separator))
 	sanitized := dirnameReplacer.Replace(path)
 
-	return filepath.Join(LLMCtxEnvRoot, "local", string(provider), sanitized), nil
+	return filepath.Join(LLMCtxEnvRoot, "local", provider.String(), sanitized), nil
 }
