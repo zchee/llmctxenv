@@ -20,19 +20,18 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/zchee/llmctxenv/contextmanager"
 	"github.com/zchee/llmctxenv/fileio"
-	"github.com/zchee/llmctxenv/instruction"
 )
 
 type listCmd struct {
-	logger  *slog.Logger
-	cliname instruction.CliName
+	logger   *slog.Logger
+	provider contextmanager.Provider
 }
 
 // NewListCmd returns the `list` subcommand that lists managed system context files.
@@ -48,7 +47,7 @@ func NewListCmd() *cobra.Command {
 	cmd.RunE = l.RunList
 
 	f := cmd.Flags()
-	f.StringVarP((*string)(&l.cliname), "cli", "c", "", "manages system context CLI name")
+	f.StringVarP((*string)(&l.provider), "provider", "p", "", "manages system context provider name")
 
 	return cmd
 }
@@ -57,29 +56,30 @@ func NewListCmd() *cobra.Command {
 //
 // TODO(zchee): fix documentations.
 func (c *listCmd) RunList(cmd *cobra.Command, args []string) error {
+	globalDir := contextmanager.SystemContextGlobalDir(c.provider)
+
 	c.logger.DebugContext(cmd.Context(), "RunList",
 		slog.Any("args", args),
-		slog.String("instructionsDir", instructionsDir),
-		slog.String("cliname", string(c.cliname)),
+		slog.String("global_directory", globalDir),
+		slog.String("provider", string(c.provider)),
 	)
 
-	if c.cliname == "" {
-		return fmt.Errorf("--cli flag must be not empty")
+	if c.provider == "" {
+		return fmt.Errorf("--provider flag must be not empty")
 	}
 
-	if !fileio.IsExist(instructionsDir) {
+	if !fileio.IsExist(globalDir) {
 		// Create instructionsDir if not exist
-		if err := os.MkdirAll(instructionsDir, 0o700); err != nil {
-			return fmt.Errorf("mkdir all %s path: %w", instructionsDir, err)
+		if err := os.MkdirAll(globalDir, 0o700); err != nil {
+			return fmt.Errorf("mkdir all %s path: %w", globalDir, err)
 		}
 		// Early return if not found instructionsDir
 		return nil
 	}
 
-	dir := filepath.Join(instructionsDir, string(c.cliname))
-	ents, err := os.ReadDir(dir)
+	ents, err := os.ReadDir(globalDir)
 	if err != nil {
-		return fmt.Errorf("ReadDir %s: %w", dir, err)
+		return fmt.Errorf("ReadDir %s: %w", globalDir, err)
 	}
 
 	files := make([]string, 0, len(ents))

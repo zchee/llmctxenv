@@ -18,25 +18,13 @@
 package cmd
 
 import (
-	"cmp"
 	"context"
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
-)
-
-const (
-	envHome   = "LLMCTXENV_ROOT"
-	dirPrefix = "llmctxenv"
-)
-
-var (
-	llmCtxEnvHome   = cmp.Or(os.Getenv(envHome), filepath.Join(os.Getenv("HOME"), "."+dirPrefix))
-	instructionsDir = filepath.Join(llmCtxEnvHome, "instructions")
 )
 
 type llmCLIEnvCmd struct {
