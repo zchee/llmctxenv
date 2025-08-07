@@ -22,28 +22,35 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"unsafe"
 
 	"github.com/bytedance/gg/gstd/gsync"
 	sha256simd "github.com/minio/sha256-simd"
 )
 
 var hashPool = gsync.Pool[hash.Hash]{
-	New: func() hash.Hash {
-		return sha256simd.New()
-	},
+	New: func() hash.Hash { return sha256simd.New() },
 }
 
-var bytesPool = gsync.Pool[*[]byte]{
-	New: func() *[]byte {
-		b := make([]byte, sha256simd.Size*2)
-		return &b
-	},
+// digestPool provides fixed-size buffers (32 bytes) for SHA-256 sums to avoid
+// per-call allocations from [hash.Hash.Sum].
+var digestPool = gsync.Pool[*[]byte]{
+	New: func() *[]byte { b := make([]byte, 0, sha256simd.Size); return &b },
+}
+
+// hexPool provides fixed-size buffers (64 bytes) for hex-encoded output.
+var hexPool = gsync.Pool[*[]byte]{
+	New: func() *[]byte { b := make([]byte, sha256simd.Size*2); return &b },
+}
+
+// copyBufPool provides reusable buffers for [io.CopyBuffer] to minimize
+// allocations during file hashing. 32 KiB matches [io.Copy] default size.
+var copyBufPool = gsync.Pool[*[]byte]{
+	New: func() *[]byte { b := make([]byte, 32*1024); return &b },
 }
 
 // HashFile computes the SHA-256 hash of the file at the given path.
-func HashFile(filepath string) (string, error) {
-	f, err := os.Open(filepath)
+func HashFile(path string) (string, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
@@ -52,17 +59,29 @@ func HashFile(filepath string) (string, error) {
 	h := hashPool.Get()
 	defer hashPool.Put(h)
 	h.Reset()
-	if _, err := io.Copy(h, f); err != nil {
+
+	// Use a pooled copy buffer to reduce allocations.
+	buf := copyBufPool.Get()
+	if _, err := io.CopyBuffer(h, f, *buf); err != nil {
+		copyBufPool.Put(buf)
 		return "", err
 	}
+	copyBufPool.Put(buf)
 
-	dst := bytesPool.Get()
-	defer bytesPool.Put(dst)
+	// Compute the sum into a pooled 32-byte buffer to avoid allocation.
+	digest := digestPool.Get()
+	sum := h.Sum((*digest)[:0])
 
-	src := h.Sum(nil)
-	hex.Encode(*dst, src)
+	// Hex-encode into a pooled 64-byte buffer.
+	hexbuf := hexPool.Get()
+	n := hex.Encode((*hexbuf)[:], sum)
 
-	out := unsafe.String(unsafe.SliceData(*dst), len(*dst))
+	// Create an immutable string by copying the bytes.
+	out := string((*hexbuf)[:n])
+
+	// Return buffers to pools.
+	hexPool.Put(hexbuf)
+	digestPool.Put(digest)
 
 	return out, nil
 }
