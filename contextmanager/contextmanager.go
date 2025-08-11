@@ -28,6 +28,7 @@ import (
 const EnvRoot = "LLMCTXENV_ROOT"
 
 var (
+	// LLMCtxEnvRoot is the root directory for llmctxenv context environments.
 	LLMCtxEnvRoot = cmp.Or(
 		os.Getenv(EnvRoot),
 		filepath.Join(os.Getenv("HOME"), ".llmctxenv"),
@@ -41,15 +42,16 @@ type Provider string
 func (p Provider) String() string { return string(p) }
 
 const (
-	ProviderClaudeCode Provider = "claude"
-	ProviderGeminiCLI  Provider = "gemini-cli"
-	ProviderQwenCLI    Provider = "qwen-cli"
-	ProviderCodex      Provider = "codex"
-	ProviderOpenCode   Provider = "opencode"
-	ProviderGoose      Provider = "goose"
-	ProviderCrush      Provider = "crush"
+	ProviderClaudeCode Provider = "claude"     // https://docs.anthropic.com/en/docs/claude-code/
+	ProviderGeminiCLI  Provider = "gemini-cli" // https://github.com/google-gemini/gemini-cli
+	ProviderQwenCLI    Provider = "qwen-cli"   // https://github.com/QwenLM/qwen-code
+	ProviderCodex      Provider = "codex"      // https://github.com/openai/codex
+	ProviderOpenCode   Provider = "opencode"   // https://github.com/sst/opencode
+	ProviderGoose      Provider = "goose"      // https://github.com/block/goose
+	ProviderCrush      Provider = "crush"      // https://github.com/charmbracelet/crush
 )
 
+// SystemContextFiles maps each [Provider] to a list of filenames that define the system context for that provider.
 var SystemContextFiles = map[Provider][]string{
 	ProviderClaudeCode: {
 		"CLAUDE.md",
