@@ -61,7 +61,7 @@ func (c *listCmd) RunList(cmd *cobra.Command, args []string) error {
 	c.logger.DebugContext(cmd.Context(), "RunList",
 		slog.Any("args", args),
 		slog.String("global_directory", globalDir),
-		slog.String("provider", string(c.provider)),
+		slog.String("provider", c.provider.String()),
 	)
 
 	if c.provider == "" {
