@@ -56,7 +56,7 @@ func NewListCmd() *cobra.Command {
 //
 // TODO(zchee): fix documentations.
 func (c *listCmd) RunList(cmd *cobra.Command, args []string) error {
-	globalDir := contextmanager.SystemContextGlobalDir(c.provider)
+	globalDir := contextmanager.GlobalDir(c.provider)
 
 	c.logger.DebugContext(cmd.Context(), "RunList",
 		slog.Any("args", args),

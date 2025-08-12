@@ -51,8 +51,8 @@ const (
 	ProviderCrush      Provider = "crush"      // https://github.com/charmbracelet/crush
 )
 
-// SystemContextFiles maps each [Provider] to a list of filenames that define the system context for that provider.
-var SystemContextFiles = map[Provider][]string{
+// ContextFiles maps each [Provider] to a list of filenames that define the system context for that provider.
+var ContextFiles = map[Provider][]string{
 	ProviderClaudeCode: {
 		"CLAUDE.md",
 	},
@@ -76,8 +76,8 @@ var SystemContextFiles = map[Provider][]string{
 	},
 }
 
-// SystemContextGlobalDir returns the directory path for the global system context of a given provider.
-func SystemContextGlobalDir(provider Provider) string {
+// GlobalDir returns the directory path for the global system context of a given provider.
+func GlobalDir(provider Provider) string {
 	return filepath.Join(LLMCtxEnvRoot, "global", provider.String())
 }
 
@@ -113,8 +113,8 @@ var dirnameReplacer = strings.NewReplacer(
 	"Z", "!z",
 )
 
-// SystemContextLocalDir returns the directory path for the local system context of a given provider.
-func SystemContextLocalDir(provider Provider, projectDir string) (string, error) {
+// LocalDir returns the directory path for the local system context of a given provider.
+func LocalDir(provider Provider, projectDir string) (string, error) {
 	path, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("get current directory: %w", err)
