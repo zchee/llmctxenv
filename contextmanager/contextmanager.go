@@ -27,12 +27,10 @@ import (
 // EnvRoot is the environment variable that specifies the root directory for llmctxenv context environments.
 const EnvRoot = "LLMCTXENV_ROOT"
 
-var (
-	// LLMCtxEnvRoot is the root directory for llmctxenv context environments.
-	LLMCtxEnvRoot = cmp.Or(
-		os.Getenv(EnvRoot),
-		filepath.Join(os.Getenv("HOME"), ".llmctxenv"),
-	)
+// LLMCtxEnvRoot is the root directory for llmctxenv context environments.
+var LLMCtxEnvRoot = cmp.Or(
+	os.Getenv(EnvRoot),
+	filepath.Join(os.Getenv("HOME"), ".llmctxenv"),
 )
 
 // Provider represents the type of LLM provider for which the system context is defined.
