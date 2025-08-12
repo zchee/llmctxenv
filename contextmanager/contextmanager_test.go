@@ -327,6 +327,10 @@ func TestPathSanitization(t *testing.T) {
 			input:    "go/src/github.com/zchee/llmctxenv",
 			expected: "go-src-github-com-zchee-llmctxenv",
 		},
+		"datadog": {
+			input:    "github.com/DataDog/datadog-agent",
+			expected: "github-com-DataDog-datadog-agent",
+		},
 		"dots to dashes": {
 			input:    "project.name",
 			expected: "project-name",
@@ -337,27 +341,27 @@ func TestPathSanitization(t *testing.T) {
 		},
 		"uppercase A": {
 			input:    "ProjectA",
-			expected: "!project!a",
+			expected: "ProjectA",
 		},
 		"uppercase B": {
 			input:    "ProjectB",
-			expected: "!project!b",
+			expected: "ProjectB",
 		},
 		"uppercase Z": {
 			input:    "ProjectZ",
-			expected: "!project!z",
+			expected: "ProjectZ",
 		},
 		"all uppercase": {
 			input:    "MYPROJECT",
-			expected: "!m!y!p!r!o!j!e!c!t",
+			expected: "MYPROJECT",
 		},
 		"mixed case with dots": {
 			input:    "My.Project.V2",
-			expected: "!my-!project-!v2",
+			expected: "My-Project-V2",
 		},
 		"complex path": {
 			input:    "My.App/src/Main.go",
-			expected: "!my-!app-src-!main-go",
+			expected: "My-App-src-Main-go",
 		},
 		"empty string": {
 			input:    "",

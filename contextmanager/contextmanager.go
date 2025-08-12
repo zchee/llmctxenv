@@ -82,33 +82,6 @@ func GlobalDir(provider Provider) string {
 var dirnameReplacer = strings.NewReplacer(
 	".", "-",
 	string(filepath.Separator), "-",
-
-	"A", "!a",
-	"B", "!b",
-	"C", "!c",
-	"D", "!d",
-	"E", "!e",
-	"F", "!f",
-	"G", "!g",
-	"H", "!h",
-	"I", "!i",
-	"J", "!j",
-	"K", "!k",
-	"L", "!l",
-	"M", "!m",
-	"N", "!n",
-	"O", "!o",
-	"P", "!p",
-	"Q", "!q",
-	"R", "!r",
-	"S", "!s",
-	"T", "!t",
-	"U", "!u",
-	"V", "!v",
-	"W", "!w",
-	"X", "!x",
-	"Y", "!y",
-	"Z", "!z",
 )
 
 // LocalDir returns the directory path for the local system context of a given provider.
